@@ -14,11 +14,36 @@ const centerX = () => canvas.width / 2;
 const centerY = () => canvas.height / 2;
 
 // =========================
+// COLORS
+// =========================
+
+function randomColor() {
+    return {
+        r: Math.floor(Math.random() * 255),
+        g: Math.floor(Math.random() * 255),
+        b: Math.floor(Math.random() * 255)
+    };
+}
+
+function mixColor(c1, c2) {
+    return {
+        r: Math.floor((c1.r + c2.r) / 2),
+        g: Math.floor((c1.g + c2.g) / 2),
+        b: Math.floor((c1.b + c2.b) / 2)
+    };
+}
+
+function toRGB(c) {
+    return `rgb(${c.r},${c.g},${c.b})`;
+}
+
+// =========================
 // PARTICLE
 // =========================
 
 class Particle {
-    constructor(x, y, vx, vy) {
+    constructor(x, y, vx, vy, color) {
+
         this.x = x;
         this.y = y;
 
@@ -27,9 +52,13 @@ class Particle {
         this.vx = vx;
         this.vy = vy;
 
+        this.color = color || randomColor();
+
+        // cooldown между размножением
         this.cooldown = 0;
 
-        this.color = `hsl(${Math.random() * 360}, 100%, 60%)`;
+        // 🔥 ИММУНИТЕТ ПОСЛЕ РОЖДЕНИЯ
+        this.birthCooldown = 30;
     }
 
     update() {
@@ -38,13 +67,13 @@ class Particle {
         this.y += this.vy;
 
         if (this.cooldown > 0) this.cooldown--;
+        if (this.birthCooldown > 0) this.birthCooldown--;
 
         const dx = this.x - centerX();
         const dy = this.y - centerY();
 
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        // bounce on circle
         if (dist + this.radius > circleRadius) {
 
             const nx = dx / dist;
@@ -63,9 +92,9 @@ class Particle {
     draw() {
 
         ctx.shadowBlur = 15;
-        ctx.shadowColor = this.color;
+        ctx.shadowColor = toRGB(this.color);
 
-        ctx.fillStyle = this.color;
+        ctx.fillStyle = toRGB(this.color);
 
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
@@ -74,7 +103,7 @@ class Particle {
 }
 
 // =========================
-// SPAWN
+// SPAWN FIRST 2
 // =========================
 
 canvas.addEventListener("click", (e) => {
@@ -91,7 +120,6 @@ canvas.addEventListener("click", (e) => {
 
     if (dist < circleRadius) {
 
-        // стартовая случайная скорость
         const vx = (Math.random() - 0.5) * 3;
         const vy = (Math.random() - 0.5) * 3;
 
@@ -106,7 +134,6 @@ canvas.addEventListener("click", (e) => {
 function handleCollisions() {
 
     for (let i = 0; i < particles.length; i++) {
-
         for (let j = i + 1; j < particles.length; j++) {
 
             const a = particles[i];
@@ -119,17 +146,21 @@ function handleCollisions() {
 
             if (dist < a.radius + b.radius) {
 
+                // ❌ нельзя размножаться если:
+                // - только родился
                 if (
                     a.cooldown === 0 &&
                     b.cooldown === 0 &&
+                    a.birthCooldown === 0 &&
+                    b.birthCooldown === 0 &&
                     particles.length < MAX_PARTICLES
                 ) {
 
-                    // нормализованный вектор между родителями
+                    // направление между ними
                     const nx = dx / dist;
                     const ny = dy / dist;
 
-                    // ПЕРПЕНДИКУЛЯР
+                    // перпендикуляр
                     const px = -ny;
                     const py = nx;
 
@@ -141,15 +172,18 @@ function handleCollisions() {
                     const newX = (a.x + b.x) / 2;
                     const newY = (a.y + b.y) / 2;
 
+                    // 🔥 МИКС ЦВЕТОВ
+                    const childColor = mixColor(a.color, b.color);
+
                     particles.push(
-                        new Particle(newX, newY, vx, vy)
+                        new Particle(newX, newY, vx, vy, childColor)
                     );
 
                     a.cooldown = 20;
                     b.cooldown = 20;
                 }
 
-                // лёгкий bounce
+                // bounce
                 [a.vx, b.vx] = [b.vx, a.vx];
                 [a.vy, b.vy] = [b.vy, a.vy];
             }
@@ -158,7 +192,7 @@ function handleCollisions() {
 }
 
 // =========================
-// DRAW CIRCLE
+// DRAW
 // =========================
 
 function drawCircle() {
@@ -178,7 +212,6 @@ function drawCircle() {
 
 function animate() {
 
-    // motion blur
     ctx.fillStyle = "rgba(0,0,0,0.15)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
