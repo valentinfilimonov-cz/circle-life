@@ -6,12 +6,78 @@ canvas.height = window.innerHeight;
 
 const particles = [];
 
-const MAX_PARTICLES = 400;
-
 let circleRadius = 250;
 
 const centerX = () => canvas.width / 2;
 const centerY = () => canvas.height / 2;
+
+const MAX_PARTICLES = 500;
+
+// =========================
+// UI
+// =========================
+
+const ui = document.createElement("div");
+ui.style.position = "fixed";
+ui.style.top = "10px";
+ui.style.left = "10px";
+ui.style.zIndex = 9999;
+ui.style.background = "rgba(0,0,0,0.5)";
+ui.style.color = "white";
+ui.style.padding = "10px";
+ui.style.borderRadius = "10px";
+ui.style.fontFamily = "Arial";
+document.body.appendChild(ui);
+
+// restart
+const restartBtn = document.createElement("button");
+restartBtn.innerText = "Restart";
+ui.appendChild(restartBtn);
+
+// speed
+ui.appendChild(document.createElement("br"));
+ui.appendChild(document.createTextNode("Speed"));
+
+const speedSlider = document.createElement("input");
+speedSlider.type = "range";
+speedSlider.min = "0.2";
+speedSlider.max = "3";
+speedSlider.step = "0.1";
+speedSlider.value = "1";
+ui.appendChild(speedSlider);
+
+// gravity
+ui.appendChild(document.createElement("br"));
+ui.appendChild(document.createTextNode("Gravity"));
+
+const gravitySlider = document.createElement("input");
+gravitySlider.type = "range";
+gravitySlider.min = "0";
+gravitySlider.max = "0.3";
+gravitySlider.step = "0.01";
+gravitySlider.value = "0.05";
+ui.appendChild(gravitySlider);
+
+// circle size
+ui.appendChild(document.createElement("br"));
+ui.appendChild(document.createTextNode("Circle"));
+
+const radiusSlider = document.createElement("input");
+radiusSlider.type = "range";
+radiusSlider.min = "80";
+radiusSlider.max = "400";
+radiusSlider.step = "10";
+radiusSlider.value = "250";
+ui.appendChild(radiusSlider);
+
+// counter
+const counter = document.createElement("div");
+ui.appendChild(counter);
+
+// restart logic
+restartBtn.onclick = () => {
+    particles.length = 0;
+};
 
 // =========================
 // COLORS
@@ -19,21 +85,21 @@ const centerY = () => canvas.height / 2;
 
 function randomColor() {
     return {
-        r: Math.floor(Math.random() * 255),
-        g: Math.floor(Math.random() * 255),
-        b: Math.floor(Math.random() * 255)
+        r: Math.random() * 255,
+        g: Math.random() * 255,
+        b: Math.random() * 255
     };
 }
 
-function mixColor(c1, c2) {
+function mixColor(a, b) {
     return {
-        r: Math.floor((c1.r + c2.r) / 2),
-        g: Math.floor((c1.g + c2.g) / 2),
-        b: Math.floor((c1.b + c2.b) / 2)
+        r: (a.r + b.r) / 2,
+        g: (a.g + b.g) / 2,
+        b: (a.b + b.b) / 2
     };
 }
 
-function toRGB(c) {
+function rgb(c) {
     return `rgb(${c.r},${c.g},${c.b})`;
 }
 
@@ -43,41 +109,48 @@ function toRGB(c) {
 
 class Particle {
     constructor(x, y, vx, vy, color) {
-
         this.x = x;
         this.y = y;
-
-        this.radius = 6;
 
         this.vx = vx;
         this.vy = vy;
 
+        this.radius = 6;
+
         this.color = color || randomColor();
 
-        // cooldown между размножением
         this.cooldown = 0;
-
-        // 🔥 ИММУНИТЕТ ПОСЛЕ РОЖДЕНИЯ
-        this.birthCooldown = 30;
+        this.birthCooldown = 40;
     }
 
     update() {
 
-        this.x += this.vx;
-        this.y += this.vy;
+        const speedFactor = parseFloat(speedSlider.value);
+        const g = parseFloat(gravitySlider.value);
+
+        // speed
+        this.x += this.vx * speedFactor;
+        this.y += this.vy * speedFactor;
+
+        // gravity toward center
+        const dx = centerX() - this.x;
+        const dy = centerY() - this.y;
+
+        this.vx += dx * g * 0.001;
+        this.vy += dy * g * 0.001;
 
         if (this.cooldown > 0) this.cooldown--;
         if (this.birthCooldown > 0) this.birthCooldown--;
 
-        const dx = this.x - centerX();
-        const dy = this.y - centerY();
+        const rx = this.x - centerX();
+        const ry = this.y - centerY();
 
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        const dist = Math.sqrt(rx * rx + ry * ry);
 
         if (dist + this.radius > circleRadius) {
 
-            const nx = dx / dist;
-            const ny = dy / dist;
+            const nx = rx / dist;
+            const ny = ry / dist;
 
             const dot = this.vx * nx + this.vy * ny;
 
@@ -92,9 +165,9 @@ class Particle {
     draw() {
 
         ctx.shadowBlur = 15;
-        ctx.shadowColor = toRGB(this.color);
+        ctx.shadowColor = rgb(this.color);
 
-        ctx.fillStyle = toRGB(this.color);
+        ctx.fillStyle = rgb(this.color);
 
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
@@ -103,7 +176,7 @@ class Particle {
 }
 
 // =========================
-// SPAWN FIRST 2
+// SPAWN
 // =========================
 
 canvas.addEventListener("click", (e) => {
@@ -120,10 +193,14 @@ canvas.addEventListener("click", (e) => {
 
     if (dist < circleRadius) {
 
-        const vx = (Math.random() - 0.5) * 3;
-        const vy = (Math.random() - 0.5) * 3;
-
-        particles.push(new Particle(x, y, vx, vy));
+        particles.push(
+            new Particle(
+                x,
+                y,
+                (Math.random() - 0.5) * 3,
+                (Math.random() - 0.5) * 3
+            )
+        );
     }
 });
 
@@ -146,8 +223,6 @@ function handleCollisions() {
 
             if (dist < a.radius + b.radius) {
 
-                // ❌ нельзя размножаться если:
-                // - только родился
                 if (
                     a.cooldown === 0 &&
                     b.cooldown === 0 &&
@@ -156,11 +231,10 @@ function handleCollisions() {
                     particles.length < MAX_PARTICLES
                 ) {
 
-                    // направление между ними
+                    // perpendicular spawn direction
                     const nx = dx / dist;
                     const ny = dy / dist;
 
-                    // перпендикуляр
                     const px = -ny;
                     const py = nx;
 
@@ -169,18 +243,20 @@ function handleCollisions() {
                     const vx = px * speed;
                     const vy = py * speed;
 
-                    const newX = (a.x + b.x) / 2;
-                    const newY = (a.y + b.y) / 2;
-
-                    // 🔥 МИКС ЦВЕТОВ
                     const childColor = mixColor(a.color, b.color);
 
                     particles.push(
-                        new Particle(newX, newY, vx, vy, childColor)
+                        new Particle(
+                            (a.x + b.x) / 2,
+                            (a.y + b.y) / 2,
+                            vx,
+                            vy,
+                            childColor
+                        )
                     );
 
-                    a.cooldown = 20;
-                    b.cooldown = 20;
+                    a.cooldown = 25;
+                    b.cooldown = 25;
                 }
 
                 // bounce
@@ -192,7 +268,7 @@ function handleCollisions() {
 }
 
 // =========================
-// DRAW
+// LOOP
 // =========================
 
 function drawCircle() {
@@ -206,14 +282,12 @@ function drawCircle() {
     ctx.stroke();
 }
 
-// =========================
-// LOOP
-// =========================
-
 function animate() {
 
     ctx.fillStyle = "rgba(0,0,0,0.15)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    circleRadius = parseInt(radiusSlider.value);
 
     drawCircle();
 
@@ -223,6 +297,8 @@ function animate() {
     }
 
     handleCollisions();
+
+    counter.innerText = `Particles: ${particles.length}`;
 
     requestAnimationFrame(animate);
 }
