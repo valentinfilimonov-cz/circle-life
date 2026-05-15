@@ -1,156 +1,223 @@
+// =========================
+// CANVAS SETUP
+// =========================
+
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-const centerX = canvas.width / 2;
-const centerY = canvas.height / 2;
-
-const circleRadius = 250;
-
-const particles = [];
-
-const MAX_PARTICLES = 300;
-
 // =========================
-// ЦВЕТА
+// UI
 // =========================
 
-function randomColor() {
+const ui = document.createElement("div");
+ui.style.position = "fixed";
+ui.style.top = "10px";
+ui.style.left = "10px";
+ui.style.color = "white";
+ui.style.fontFamily = "Arial";
+ui.style.zIndex = 1000;
+ui.style.background = "rgba(0,0,0,0.4)";
+ui.style.padding = "10px";
+ui.style.borderRadius = "10px";
+document.body.appendChild(ui);
 
-    return {
-        r: Math.floor(Math.random() * 256),
-        g: Math.floor(Math.random() * 256),
-        b: Math.floor(Math.random() * 256)
-    };
-}
+// restart button
+const restartBtn = document.createElement("button");
+restartBtn.innerText = "Restart";
+ui.appendChild(restartBtn);
 
-function mixColors(c1, c2) {
+// slider speed
+const speedLabel = document.createElement("div");
+speedLabel.innerText = "Speed";
+ui.appendChild(speedLabel);
 
-    return {
-        r: Math.floor((c1.r + c2.r) / 2),
-        g: Math.floor((c1.g + c2.g) / 2),
-        b: Math.floor((c1.b + c2.b) / 2)
-    };
-}
+const speedSlider = document.createElement("input");
+speedSlider.type = "range";
+speedSlider.min = "0.2";
+speedSlider.max = "3";
+speedSlider.step = "0.1";
+speedSlider.value = "1";
+ui.appendChild(speedSlider);
 
-function colorToString(color) {
+// circle size
+const radiusLabel = document.createElement("div");
+radiusLabel.innerText = "Circle size";
+ui.appendChild(radiusLabel);
 
-    return `rgb(${color.r}, ${color.g}, ${color.b})`;
+const radiusSlider = document.createElement("input");
+radiusSlider.type = "range";
+radiusSlider.min = "80";
+radiusSlider.max = "400";
+radiusSlider.step = "10";
+radiusSlider.value = "250";
+ui.appendChild(radiusSlider);
+
+// counter
+const counter = document.createElement("div");
+ui.appendChild(counter);
+
+// =========================
+// AUDIO (soft plop)
+// =========================
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function plop() {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.value = 200 + Math.random() * 200;
+
+    gain.gain.value = 0.03;
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.05);
 }
 
 // =========================
-// ЧАСТИЦА
+// WORLD
+// =========================
+
+let particles = [];
+
+let circleRadius = 250;
+
+const centerX = () => canvas.width / 2;
+const centerY = () => canvas.height / 2;
+
+const MAX_PARTICLES = 400;
+
+// =========================
+// TYPES
+// =========================
+
+const TYPES = ["normal", "slow", "aggressive", "eater"];
+
+function randomType() {
+    const r = Math.random();
+    if (r < 0.6) return "normal";
+    if (r < 0.75) return "slow";
+    if (r < 0.9) return "aggressive";
+    return "eater";
+}
+
+function typeColor(type) {
+    switch (type) {
+        case "normal": return "cyan";
+        case "slow": return "blue";
+        case "aggressive": return "red";
+        case "eater": return "magenta";
+    }
+}
+
+// =========================
+// PARTICLE
 // =========================
 
 class Particle {
-
-    constructor(x, y, color = randomColor()) {
-
+    constructor(x, y, type = randomType()) {
         this.x = x;
         this.y = y;
 
-        this.radius = 6;
+        this.type = type;
 
-        this.color = color;
+        this.radius = type === "eater" ? 8 : 5;
 
-        this.vx = (Math.random() - 0.25) * 10;
-        this.vy = (Math.random() - 0.25) * 10;
+        const speed = type === "slow" ? 0.5 : 1.5;
 
-        // задержка между размножениями
+        this.vx = (Math.random() - 0.5) * 3 * speed;
+        this.vy = (Math.random() - 0.5) * 3 * speed;
+
         this.cooldown = 0;
     }
 
     update() {
 
-        this.x += this.vx;
-        this.y += this.vy;
+        const speedFactor = parseFloat(speedSlider.value);
 
-        // уменьшаем cooldown
-        if (this.cooldown > 0) {
-            this.cooldown--;
-        }
+        this.x += this.vx * speedFactor;
+        this.y += this.vy * speedFactor;
 
-        const dx = this.x - centerX;
-        const dy = this.y - centerY;
+        if (this.cooldown > 0) this.cooldown--;
 
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        const dx = this.x - centerX();
+        const dy = this.y - centerY();
 
-        // столкновение со стенкой круга
-        if (distance + this.radius > circleRadius) {
+        const dist = Math.sqrt(dx * dx + dy * dy);
 
-            const nx = dx / distance;
-            const ny = dy / distance;
+        if (dist + this.radius > circleRadius) {
+
+            const nx = dx / dist;
+            const ny = dy / dist;
 
             const dot = this.vx * nx + this.vy * ny;
 
             this.vx -= 2 * dot * nx;
             this.vy -= 2 * dot * ny;
 
-            this.x = centerX + nx * (circleRadius - this.radius);
-            this.y = centerY + ny * (circleRadius - this.radius);
+            this.x = centerX() + nx * (circleRadius - this.radius);
+            this.y = centerY() + ny * (circleRadius - this.radius);
         }
     }
 
     draw() {
 
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = typeColor(this.type);
+
+        ctx.fillStyle = typeColor(this.type);
+
         ctx.beginPath();
-
-        ctx.arc(
-            this.x,
-            this.y,
-            this.radius,
-            0,
-            Math.PI * 2
-        );
-
-        // glow
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = colorToString(this.color);
-
-        ctx.fillStyle = colorToString(this.color);
-
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
     }
 }
 
 // =========================
-// КЛИКИ
+// RESET
 // =========================
 
-canvas.addEventListener("click", (event) => {
+function reset() {
+    particles = [];
+}
 
-    // только 2 стартовых шарика
+restartBtn.onclick = reset;
+
+// =========================
+// SPAWN
+// =========================
+
+canvas.addEventListener("click", (e) => {
+
     if (particles.length >= 2) return;
 
-    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
 
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    const dx = x - centerX();
+    const dy = y - centerY();
 
-    const dx = x - centerX;
-    const dy = y - centerY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
 
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    // только внутри круга
-    if (distance <= circleRadius) {
-
-        particles.push(
-            new Particle(x, y)
-        );
+    if (dist < circleRadius) {
+        particles.push(new Particle(x, y));
     }
 });
 
 // =========================
-// СТОЛКНОВЕНИЯ
+// COLLISIONS
 // =========================
 
 function handleCollisions() {
 
     for (let i = 0; i < particles.length; i++) {
-
         for (let j = i + 1; j < particles.length; j++) {
 
             const a = particles[i];
@@ -159,106 +226,111 @@ function handleCollisions() {
             const dx = a.x - b.x;
             const dy = a.y - b.y;
 
-            const distance = Math.sqrt(dx * dx + dy * dy);
+            const dist = Math.sqrt(dx * dx + dy * dy);
 
-            // столкновение
-            if (distance < a.radius + b.radius) {
+            if (dist < a.radius + b.radius) {
 
-                // размножение
+                // eater logic
+                if (a.type === "eater" && b.type !== "eater") {
+                    particles.splice(j, 1);
+                    plop();
+                    continue;
+                }
+
+                if (b.type === "eater" && a.type !== "eater") {
+                    particles.splice(i, 1);
+                    plop();
+                    continue;
+                }
+
+                // spawn logic
                 if (
-                    a.cooldown <= 0 &&
-                    b.cooldown <= 0 &&
+                    a.cooldown === 0 &&
+                    b.cooldown === 0 &&
                     particles.length < MAX_PARTICLES
                 ) {
-
-                    const newX = (a.x + b.x) / 2;
-                    const newY = (a.y + b.y) / 2;
-
-                    // смешиваем цвета
-                    const childColor = mixColors(
-                        a.color,
-                        b.color
-                    );
+                    const childType = Math.random() < 0.5 ? a.type : b.type;
 
                     particles.push(
                         new Particle(
-                            newX,
-                            newY,
-                            childColor
+                            (a.x + b.x) / 2,
+                            (a.y + b.y) / 2,
+                            childType
                         )
                     );
 
-                    // cooldown
-                    a.cooldown = 30;
-                    b.cooldown = 30;
+                    a.cooldown = 25;
+                    b.cooldown = 25;
+
+                    plop();
                 }
 
-                // простой физический отскок
-                const tempVx = a.vx;
-                const tempVy = a.vy;
-
-                a.vx = b.vx;
-                a.vy = b.vy;
-
-                b.vx = tempVx;
-                b.vy = tempVy;
+                // bounce
+                [a.vx, b.vx] = [b.vx, a.vx];
+                [a.vy, b.vy] = [b.vy, a.vy];
             }
         }
     }
 }
 
 // =========================
-// КРУГ
+// BACKGROUND (gradient + motion blur)
+// =========================
+
+function drawBackground() {
+
+    const g = ctx.createRadialGradient(
+        centerX(), centerY(), 50,
+        centerX(), centerY(), canvas.width
+    );
+
+    g.addColorStop(0, "#05010a");
+    g.addColorStop(1, "#000000");
+
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+// =========================
+// CIRCLE
 // =========================
 
 function drawCircle() {
 
-    ctx.beginPath();
-
-    ctx.arc(
-        centerX,
-        centerY,
-        circleRadius,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 3;
-
     ctx.shadowBlur = 0;
+    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+    ctx.lineWidth = 2;
 
+    ctx.beginPath();
+    ctx.arc(centerX(), centerY(), circleRadius, 0, Math.PI * 2);
     ctx.stroke();
 }
 
 // =========================
-// АНИМАЦИЯ
+// LOOP
 // =========================
 
 function animate() {
 
-    // trails
-    ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
+    // motion blur
+    ctx.fillStyle = "rgba(0,0,0,0.15)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillRect(
-        0,
-        0,
-        canvas.width,
-        canvas.height
-    );
-
+    drawBackground();
     drawCircle();
 
-    particles.forEach((particle) => {
-
-        particle.update();
-        particle.draw();
-    });
+    for (const p of particles) {
+        p.update();
+        p.draw();
+    }
 
     handleCollisions();
+
+    counter.innerText = "Particles: " + particles.length;
+
+    circleRadius = parseInt(radiusSlider.value);
 
     requestAnimationFrame(animate);
 }
 
-// старт
 animate();
