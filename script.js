@@ -55,8 +55,8 @@ class Particle {
 
         this.color = color;
 
-        this.vx = (Math.random() - 0.5) * 6;
-        this.vy = (Math.random() - 0.5) * 6;
+        this.vx = (Math.random() - 1) * 6;
+        this.vy = (Math.random() - 1) * 6;
 
         // задержка между размножениями
         this.cooldown = 0;
