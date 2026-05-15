@@ -1,5 +1,5 @@
 // =========================
-// CANVAS SETUP 
+// CANVAS SETUP
 // =========================
 
 const canvas = document.getElementById("canvas");
